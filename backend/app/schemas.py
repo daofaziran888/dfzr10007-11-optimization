@@ -28,6 +28,18 @@ class EntryPayload(BaseModel):
     remark: str | None = None
 
 
+class MigrationPayload(BaseModel):
+    """旧异动窗口迁移入参：批次名可选，codes 用于只重试指定记录。
+
+    fixes 给失败区间提供「按原记录修正后的描述」，只作用于本次迁移的副本，
+    原窗口表仍然保留旧值可供追溯。
+    """
+
+    batch: str | None = None
+    codes: list[str] = Field(default_factory=list)
+    fixes: dict[str, str] = Field(default_factory=dict)
+
+
 
 class MartEntry(BaseModel):
     """集市定义明细结构。"""
@@ -78,16 +90,20 @@ class CollabEntry(BaseModel):
     field_7: str | None = None  # 看板状态
 
 class AnomalyEntry(BaseModel):
-    """异动记录明细结构。"""
+    """异动条目明细结构：旧窗口拆成独立条目后补齐归因维度与水位字段。"""
 
     field_0: str | None = None  # 记录编号
     field_1: str | None = None  # 指标名称
     field_2: str | None = None  # 异动方向
-    field_3: str | None = None  # 异动幅度
+    field_3: float | None = None  # 异动幅度（百分比数值）
     field_4: str | None = None  # 归因维度
     field_5: str | None = None  # 归因结论
     field_6: str | None = None  # 处理建议
     field_7: str | None = None  # 异动时间
+    field_8: str | None = None  # 水位
+    field_9: str | None = None  # 水位起点
+    field_10: str | None = None  # 水位终点
+    field_11: dict[str, Any] | None = None  # 旧值（原窗口字段，供追溯）
 
 class ModelEntry(BaseModel):
     """模型注册明细结构。"""
@@ -136,6 +152,7 @@ class EtlEntry(BaseModel):
     field_5: str | None = None  # 调度周期
     field_6: str | None = None  # 依赖关系
     field_7: str | None = None  # 任务状态
+    field_8: str | None = None  # 消费水位
 
 class CatalogEntry(BaseModel):
     """目录条目明细结构。"""
@@ -172,6 +189,9 @@ class CompareEntry(BaseModel):
     field_5: str | None = None  # 告警配置
     field_6: str | None = None  # 对比维度
     field_7: str | None = None  # 方案状态
+    field_8: str | None = None  # 归因维度（迁移后）
+    field_9: str | None = None  # 归因结论（迁移后）
+    field_10: str | None = None  # 归因水位（迁移后）
 
 class ExportEntry(BaseModel):
     """导出任务明细结构。"""

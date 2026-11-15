@@ -1,8 +1,9 @@
-"""同环比分析业务规则：状态流转、字段校验与筛选口径都收在这里。"""
+"""同环比分析业务规则：状态流转、字段校验、归因结论读取与筛选口径都收在这里。"""
 from __future__ import annotations
 
 from typing import Any
 
+from app.services.anomaly import AnomalyService
 from app.store import store
 
 MODULE = "compare"
@@ -13,6 +14,23 @@ NEGATIVE_ACTIONS = []
 
 
 class CompareService:
+    def __init__(self) -> None:
+        self._anomalies = AnomalyService()
+
+    def _with_attribution(self, row: dict[str, Any]) -> dict[str, Any]:
+        """同环比分析读取迁移后的归因结论，而不是旧窗口描述。"""
+        item = dict(row)
+        metric = str(item.get("对比指标") or "")
+        dimension = str(item.get("对比维度") or "")
+        attribution = self._anomalies.attribution_for(metric, dimension) if metric else None
+        if attribution is None and metric:
+            attribution = self._anomalies.attribution_for(metric)
+        item["归因结论"] = attribution.get("归因结论") if attribution else ""
+        item["归因维度"] = attribution.get("归因维度") if attribution else dimension
+        item["归因水位"] = attribution.get("归因水位") if attribution else ""
+        item["归因记录编号"] = attribution.get("归因记录编号") if attribution else ""
+        return item
+
     def list_entries(
         self,
         *,
@@ -28,10 +46,11 @@ class CompareService:
             rows = [row for row in rows if row.get("status") == status]
         total = len(rows)
         start = max(page - 1, 0) * size
-        return rows[start:start + size], total
+        return [self._with_attribution(row) for row in rows[start:start + size]], total
 
     def get_entry(self, entry_id: int) -> dict[str, Any] | None:
-        return store.find(MODULE, entry_id)
+        entry = store.find(MODULE, entry_id)
+        return self._with_attribution(entry) if entry is not None else None
 
     def create_entry(self, values: dict[str, Any]) -> tuple[dict[str, Any] | None, list[str]]:
         missing = [field for field in REQUIRED_FIELDS if not str(values.get(field) or "").strip()]
@@ -58,4 +77,4 @@ class CompareService:
         entry["status"] = target
         entry["pending"] = target != STATUS_ORDER[-1]
         entry["abnormal"] = action in NEGATIVE_ACTIONS
-        return entry, f"对比方案已{action}"
+        return self._with_attribution(entry), f"对比方案已{action}"

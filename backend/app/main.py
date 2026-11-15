@@ -5,11 +5,12 @@
 """
 from __future__ import annotations
 
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.config import settings
 from app.routers import ROUTERS
+from app.services.anomaly import AnomalyService
 from app.store import store
 
 app = FastAPI(title="数据洞察与自助分析平台", version="1.0.0")
@@ -22,8 +23,24 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+
+@app.middleware("http")
+async def persist_after_write(request: Request, call_next):
+    """写请求结束后落盘；读请求不动数据库，避免无谓写放大。"""
+    response = await call_next(request)
+    if request.method not in {"GET", "HEAD", "OPTIONS"}:
+        store.persist()
+    return response
+
+
 for module in ROUTERS:
     app.include_router(module.router)
+
+# 启动回填旧异动窗口：幂等，失败行留在原表，不阻断服务启动。
+startup_backfill: dict[str, object] = {}
+if settings.auto_backfill:
+    startup_backfill = AnomalyService().migrate_legacy(batch="startup-backfill")
+    store.persist()
 
 
 @app.get("/api/health")

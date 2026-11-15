@@ -11,7 +11,10 @@ const columns = [
   "增长阈值",
   "告警配置",
   "对比维度",
-  "方案状态"
+  "方案状态",
+  "归因维度",
+  "归因结论",
+  "归因水位"
 ]
 const actions = [
   "启用方案",
@@ -24,19 +27,10 @@ const statuses = [
   "已暂停",
   "已关闭"
 ]
-const stats = [
-  {
-    "label": "对比方案总数",
-    "value": 0
-  },
-  {
-    "label": "已启用方案",
-    "value": 0
-  },
-  {
-    "label": "已暂停方案",
-    "value": 0
-  }
+const statLabels = [
+  "对比方案总数",
+  "已启用方案",
+  "归因结论已切换",
 ]
 
 type Row = Record<string, string | number | null>
@@ -47,6 +41,14 @@ export default function CompareView() {
   const [errorMessage, setErrorMessage] = useState('')
   const [filters, setFilters] = useState<Record<string, string>>({})
   const filterFields = useMemo(() => columns.slice(0, 3), [])
+  const stats = useMemo(() => {
+    const values = [
+      total,
+      rows.filter((row) => row["方案状态"] === "已启用").length,
+      rows.filter((row) => Boolean(row["归因结论"])).length,
+    ]
+    return statLabels.map((label, index) => ({ label, value: values[index] }))
+  }, [rows, total])
 
   const reload = useCallback(async () => {
     setErrorMessage('')
@@ -89,7 +91,7 @@ export default function CompareView() {
       <header className="page-head">
         <div>
           <h2>同环比分析管理</h2>
-          <p className="page-desc">维护同环比分析的周期配置、增长阈值与告警策略，为同环比分析提供可验证的数据工程流程。</p>
+          <p className="page-desc">维护同环比分析的周期配置、增长阈值与告警策略；归因结论直接读取迁移后的异动条目与归因水位，不再解析旧窗口描述。</p>
         </div>
         <div className="page-actions">
           <button className="btn primary" type="button" onClick={() => setErrorMessage('对比方案登记入口尚未接入审批流')}>
@@ -154,7 +156,7 @@ export default function CompareView() {
       </table>
 
       <footer className="page-foot">
-        <span>共 {total} 条同环比分析记录</span>
+        <span>共 {total} 条同环比分析记录 · 归因结论来自指标异动条目的最新水位</span>
         {errorMessage && <span className="error-text">{errorMessage}</span>}
       </footer>
     </section>

@@ -5,9 +5,16 @@ services:
       - "8000:8000"
     environment:
       - APP_ENV=local
+      # 回填结果落盘到命名卷，重启容器后迁移状态与水位仍然可读。
+      - APP_DB_PATH=/srv/data/app.sqlite3
+    volumes:
+      - backend-data:/srv/data
   frontend:
     build: ./frontend
     ports:
       - "5173:5173"
     depends_on:
       - backend
+
+volumes:
+  backend-data:
